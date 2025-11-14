@@ -5,7 +5,6 @@ import com.infosys.seatsync.dto.CityDto;
 import com.infosys.seatsync.dto.DCInfoResponseDto;
 import com.infosys.seatsync.dto.DataCenterDto;
 import com.infosys.seatsync.entity.Block;
-import com.infosys.seatsync.entity.DeliveryCenter;
 import com.infosys.seatsync.repository.BlockRepository;
 import com.infosys.seatsync.repository.DeliveryCenterRepository;
 import com.infosys.seatsync.service.DCDetailsService;
@@ -22,9 +21,6 @@ import java.util.stream.Collectors;
 public class DCDetailsServiceImpl implements DCDetailsService {
 
     @Autowired
-    DeliveryCenterRepository deliveryCenterRepository;
-
-    @Autowired
     BlockRepository blockRepository;
 
     @Override
@@ -36,7 +32,7 @@ public class DCDetailsServiceImpl implements DCDetailsService {
         // STEP 1: Group by City Name
         Map<String, Map<Object, List<Block>>> grouped = blocks.stream()
                 .collect(Collectors.groupingBy(
-                        b -> b.getDeliveryCenter().getLocation().split(",")[0],  // Extract city from "Chennai, India"
+                        b -> b.getDeliveryCenter().getLocation().split(",")[0],
                         Collectors.groupingBy(b -> b.getDeliveryCenter().getDcId())
                 ));
 
