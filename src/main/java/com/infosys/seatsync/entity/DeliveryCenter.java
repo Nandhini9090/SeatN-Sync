@@ -15,5 +15,38 @@ public class DeliveryCenter {
 
     private String dcName;
     private String location;
+
+    @Override
+    public String toString() {
+        return "DeliveryCenter{" +
+                "dcId=" + dcId +
+                ", dcName='" + dcName + '\'' +
+                ", location='" + location + '\'' +
+                '}';
+    }
+
+    public Long getDcId() {
+        return dcId;
+    }
+
+    public void setDcId(Long dcId) {
+        this.dcId = dcId;
+    }
+
+    public String getDcName() {
+        return dcName;
+    }
+
+    public void setDcName(String dcName) {
+        this.dcName = dcName;
+    }
+
+    public String getLocation() {
+        return location;
+    }
+
+    public void setLocation(String location) {
+        this.location = location;
+    }
 }
 
