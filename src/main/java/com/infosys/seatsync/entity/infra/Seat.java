@@ -1,4 +1,4 @@
-package com.infosys.seatsync.entity;
+package com.infosys.seatsync.entity.infra;
 
 
 import jakarta.persistence.*;
@@ -14,8 +14,9 @@ public class Seat {
     private String seatCode;
     private String cubicleId;
     private Boolean isAvailable = true;
+    private String bookedBy;
 
     @ManyToOne
-    @JoinColumn(name = "block_id")
-    private Block block;
+    @JoinColumn(name = "wing_id")
+    private Wing wing;
 }

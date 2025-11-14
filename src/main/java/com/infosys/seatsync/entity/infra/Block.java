@@ -1,7 +1,9 @@
-package com.infosys.seatsync.entity;
+package com.infosys.seatsync.entity.infra;
 
 import jakarta.persistence.*;
 import lombok.Data;
+
+import java.util.List;
 
 @Entity
 @Data
@@ -11,20 +13,14 @@ public class Block {
     private Long blockId;
 
     private String blockName;
-    private Integer totalSeats;
-
-    @Enumerated(EnumType.STRING)
-    private AccessType accessType;
-
     @ManyToOne
     @JoinColumn(name = "dc_id")
     private DeliveryCenter deliveryCenter;
 
-    public Block() {
-    }
+    @OneToMany(mappedBy = "block")
+    private List<Wing> wings;
 
-    public enum AccessType {
-        RESTRICTED, UNRESTRICTED
+    public Block() {
     }
 
     @Override
@@ -32,10 +28,17 @@ public class Block {
         return "Block{" +
                 "blockId=" + blockId +
                 ", blockName='" + blockName + '\'' +
-                ", totalSeats=" + totalSeats +
-                ", accessType=" + accessType +
                 ", deliveryCenter=" + deliveryCenter +
+                ", wings=" + wings +
                 '}';
+    }
+
+    public List<Wing> getWings() {
+        return wings;
+    }
+
+    public void setWings(List<Wing> wings) {
+        this.wings = wings;
     }
 
     public Long getBlockId() {
@@ -52,22 +55,6 @@ public class Block {
 
     public void setBlockName(String blockName) {
         this.blockName = blockName;
-    }
-
-    public Integer getTotalSeats() {
-        return totalSeats;
-    }
-
-    public void setTotalSeats(Integer totalSeats) {
-        this.totalSeats = totalSeats;
-    }
-
-    public AccessType getAccessType() {
-        return accessType;
-    }
-
-    public void setAccessType(AccessType accessType) {
-        this.accessType = accessType;
     }
 
     public DeliveryCenter getDeliveryCenter() {

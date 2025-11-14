@@ -1,6 +1,6 @@
 package com.infosys.seatsync.repository;
 
-import com.infosys.seatsync.entity.Block;
+import com.infosys.seatsync.entity.infra.Block;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

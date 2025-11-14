@@ -1,5 +1,7 @@
-package com.infosys.seatsync.entity;
+package com.infosys.seatsync.entity.booking;
 
+import com.infosys.seatsync.entity.emp.Employee;
+import com.infosys.seatsync.entity.infra.Block;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 

@@ -1,5 +1,6 @@
-package com.infosys.seatsync.entity;
+package com.infosys.seatsync.entity.emp;
 
+import com.infosys.seatsync.entity.emp.Employee;
 import jakarta.persistence.*;
 import lombok.Data;
 

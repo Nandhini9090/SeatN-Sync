@@ -1,4 +1,4 @@
-package com.infosys.seatsync.entity;
+package com.infosys.seatsync.entity.infra;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;

@@ -1,6 +1,6 @@
 package com.infosys.seatsync.repository;
 
-import com.infosys.seatsync.entity.Booking;
+import com.infosys.seatsync.entity.booking.Booking;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
