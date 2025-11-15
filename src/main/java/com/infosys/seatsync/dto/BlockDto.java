@@ -4,15 +4,26 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
 public class BlockDto {
     private Long blockId;
     private String blockName;
+    private List<WingDto> wings;
 
     public Long getBlockId() {
         return blockId;
+    }
+
+    public List<WingDto> getWings() {
+        return wings;
+    }
+
+    public void setWings(List<WingDto> wings) {
+        this.wings = wings;
     }
 
     public void setBlockId(Long blockId) {

@@ -1,11 +1,10 @@
 package com.infosys.seatsync.service.impl;
 
-import com.infosys.seatsync.dto.BlockDto;
-import com.infosys.seatsync.dto.CityDto;
-import com.infosys.seatsync.dto.DCInfoResponseDto;
-import com.infosys.seatsync.dto.DataCenterDto;
+import com.infosys.seatsync.dto.*;
 import com.infosys.seatsync.entity.infra.Block;
+import com.infosys.seatsync.entity.infra.Wing;
 import com.infosys.seatsync.repository.BlockRepository;
+import com.infosys.seatsync.repository.WingRepository;
 import com.infosys.seatsync.service.DCDetailsService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -22,11 +21,15 @@ public class DCDetailsServiceImpl implements DCDetailsService {
     @Autowired
     BlockRepository blockRepository;
 
+    @Autowired
+    WingRepository wingRepository;
+
     @Override
     public DCInfoResponseDto getAllDCInfo() {
         DCInfoResponseDto dcInfoResponseDto = new DCInfoResponseDto();
 
         List<Block> blocks = blockRepository.findAll();
+        System.out.println(blocks);
 
         // STEP 1: Group by City Name
         Map<String, Map<Object, List<Block>>> grouped = blocks.stream()
@@ -59,9 +62,16 @@ public class DCDetailsServiceImpl implements DCDetailsService {
                     BlockDto dto = new BlockDto();
                     dto.setBlockId(block.getBlockId());
                     dto.setBlockName(block.getBlockName());
+                    List<WingDto> wingList = block.getWings().stream().map(wing -> {
+                        WingDto wingDto = new WingDto();
+                        wingDto.setWingId(wing.getWingId());
+                        wingDto.setWingName(wing.getWingName());
+                        wingDto.setAccessType(wing.getAccessType());
+                        return wingDto;
+                    }).collect(Collectors.toList());
+                    dto.setWings(wingList);
                     return dto;
                 }).collect(Collectors.toList());
-
                 dcDTO.setBlocks(blockDTOList);
                 dcDTOList.add(dcDTO);
             }
