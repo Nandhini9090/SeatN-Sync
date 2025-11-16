@@ -41,23 +41,6 @@ public class Seat {
 	public void setCubicleId(String cubicleId) {
 		this.cubicleId = cubicleId;
 	}
-
-	public Boolean getIsAvailable() {
-		return isAvailable;
-	}
-
-	public void setIsAvailable(Boolean isAvailable) {
-		this.isAvailable = isAvailable;
-	}
-
-	public String getBookedBy() {
-		return bookedBy;
-	}
-
-	public void setBookedBy(String bookedBy) {
-		this.bookedBy = bookedBy;
-	}
-
 	public Wing getWing() {
 		return wing;
 	}
