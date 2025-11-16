@@ -1,6 +1,7 @@
 package com.infosys.seatsync.repository;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -18,5 +19,12 @@ public interface SeatBookingRepository extends JpaRepository<Booking, Long> {
             "AND b.status IN ('BOOKED', 'CHECKED_IN')", 
     nativeQuery = true)	
 	List<Booking> findBookingInfo(@Param("seatId") Long seatId, @Param("date") String date);
+
+	Optional<Booking> findByEmployee_EmpIdAndSeat_HashCodeAndBookingDateAndStatus(
+			String empId,
+			String hashCode,
+			String bookingDate,
+			Booking.BookingStatus status
+	);
 
 }
