@@ -38,7 +38,7 @@ public class SeatAvailabilityController {
             System.out.println("JAVA REQUEST -> " + request);
 
             SeatAvailabilityResponse resp = seatAvailabilityService.getAvailableSeats(request);
-            return ResponseEntity.ok(null);
+            return ResponseEntity.ok(resp);
 
         } catch (JsonProcessingException e) {
             e.printStackTrace();

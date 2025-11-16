@@ -5,7 +5,7 @@ import java.util.Map;
 
 public class SeatAvailabilityResponse {
 	private Map<String, BlockAvailability> fullDayAvailability;
-	private Map<String, List<SlotAvailability>> slotAvailability;
+	private Map<String, List<String>> slotAvailability;
 
 	public Map<String, BlockAvailability> getFullDayAvailability() {
 		return fullDayAvailability;
@@ -15,11 +15,11 @@ public class SeatAvailabilityResponse {
 		this.fullDayAvailability = fullDayAvailability;
 	}
 
-	public Map<String, List<SlotAvailability>> getSlotAvailability() {
+	public Map<String, List<String>> getSlotAvailability() {
 		return slotAvailability;
 	}
 
-	public void setSlotAvailability(Map<String, List<SlotAvailability>> slotAvailability) {
+	public void setSlotAvailability(Map<String, List<String>> slotAvailability) {
 		this.slotAvailability = slotAvailability;
 	}
 }

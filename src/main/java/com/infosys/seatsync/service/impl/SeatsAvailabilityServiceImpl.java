@@ -3,12 +3,11 @@ package com.infosys.seatsync.service.impl;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,10 +20,10 @@ import com.infosys.seatsync.entity.infra.Seat;
 import com.infosys.seatsync.model.BlockAvailability;
 import com.infosys.seatsync.model.SeatAvailabilityRequest;
 import com.infosys.seatsync.model.SeatAvailabilityResponse;
-import com.infosys.seatsync.model.SlotAvailability;
 import com.infosys.seatsync.repository.SeatBookingRepository;
 import com.infosys.seatsync.repository.SeatRepository;
 import com.infosys.seatsync.service.SeatsAvailabilityService;
+import com.infosys.seatsync.service.util.SlotUtil;
 
 @Service
 public class SeatsAvailabilityServiceImpl implements SeatsAvailabilityService {
@@ -41,56 +40,100 @@ public class SeatsAvailabilityServiceImpl implements SeatsAvailabilityService {
 
 	@Override
 	public SeatAvailabilityResponse getAvailableSeats(SeatAvailabilityRequest request) {
-		// response
+
 		SeatAvailabilityResponse response = new SeatAvailabilityResponse();
 
-		if (null == request || null == request.getWingId()) {
+		if (request == null || request.getWingId() == null) {
 			throw new IllegalArgumentException("Request or WingId is null");
 		}
 
 		List<String> dates = request.getDates();
 		if (CollectionUtils.isEmpty(dates)) {
-			logger.info("date is not available, setting it as today's date");
 			LocalDate today = LocalDate.now();
-			DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-			String todayAsString = today.format(formatter);
-			dates.add(todayAsString);
-			logger.info("SeatAvailabilityResponse ::::" + dates);
+			dates.add(today.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
 		}
+        
+		logger.info("SeatAvailabilityResponse :::: Dates" + dates);
 
 		Long wingId = request.getWingId();
 
-		// 1. fetch all seats for wing
-		List<Seat> seatList = seatRepository.getSeatsByWing(wingId);
-		// total available seats for a wing
-		int totalSeats = seatList == null ? 0 : seatList.size();
-
-		Map<String, BlockAvailability> responseMap = new LinkedHashMap<>();
-
-		// count available seats for full day
-		if ("FULLDAY".equalsIgnoreCase(request.getDuration())) {
-
-			for (String date : dates) {
-				// 2.bookings for wing+date
-				List<Booking> bookings = bookingRepository.findBySeatAndDate(wingId, date);
-
-				Set<Long> blockedSeatIds = (bookings == null) ? Collections.emptySet()
-						: bookings.stream().filter(b -> b.getSeat() != null && b.getSeat().getSeatId() != null)
-								.filter(b -> blockingSeats.contains(b.getStatus())).map(b -> b.getSeat().getSeatId())
-								.collect(Collectors.toSet());
-
-				int available = Math.max(0, totalSeats - blockedSeatIds.size());
-
-				BlockAvailability availability = new BlockAvailability(wingId, totalSeats, available);
-				responseMap.put(date, availability);
-			}
-			response.setFullDayAvailability(responseMap);
-		} else {
-			
-			//Todo time slot
-		}
+		// Fetch seats for wing
+		List<Seat> seats = seatRepository.getSeatsByWing(wingId);
 		
+		logger.info("SeatAvailabilityResponse :::: seats" + seats);
+
+		if (request.getDuration().equalsIgnoreCase("FullDay")) {
+			response.setFullDayAvailability(processFullDay(request, seats));
+		} else {
+			response.setSlotAvailability(processSlots(request, seats));
+ 		}
+        
+		logger.info("SeatAvailabilityResponse :::: Resonse ::" + response);
+
 		return response;
+	}
+
+	private Map<String, BlockAvailability> processFullDay(SeatAvailabilityRequest req, List<Seat> seats) {
+		Map<String, BlockAvailability> map = new HashMap<String, BlockAvailability>();
+
+		for (String date : req.getDates()) {
+			int available = 0;
+
+			for (Seat seat : seats) {
+				// Fetch bookings with the status Booked and CheckedIn
+				List<Booking> bookings = bookingRepository.findBookingInfo(seat.getSeatId(), date);
+				logger.info("processFullDay bookings:::  " + bookings);
+				// if bookings is empty, then no bookings is available for that seat for that
+				// day, So increase available seats count.
+				if (bookings.isEmpty()) {
+					available++;
+				}
+			}
+			BlockAvailability ba = new BlockAvailability();
+			ba.setWingId(req.getWingId());
+			ba.setTotalSeats(seats.size());
+			ba.setAvailableSeats(available);
+ 			map.put(date, ba);
+			logger.info("processFullDay :::  " + map.toString());
+		}
+		return map;
+	}
+
+	private Map<String, List<String>> processSlots(SeatAvailabilityRequest req, List<Seat> seats) {
+		Map<String, List<String>> map = new HashMap<>();
+   
+		String reqStart = req.getTimeSlot().getStartTime();
+		String reqEnd = req.getTimeSlot().getEndTime();
+
+		for (String date : req.getDates()) {
+
+			Set<String> freeSlots = new HashSet<>(SlotUtil.getSlots().keySet());
+
+			for (Seat seat : seats) {
+				List<Booking> bookings = bookingRepository.findBookingInfo(seat.getSeatId(), date);
+				logger.info("processSlots bookings:::  " + bookings);
+				for (Booking b : bookings) {
+
+					// Full day booked → no slots allowed
+					if (SlotUtil.isFullDayBooking(b.getStartTime(), b.getEndTime())) {
+						freeSlots.clear();
+						break;
+					}
+
+					// If overlaps remove slot
+					if (SlotUtil.overlaps(reqStart, reqEnd, b.getStartTime(), b.getEndTime())) {
+						String s = SlotUtil.getSlotName(b.getStartTime(), b.getEndTime());
+						freeSlots.remove(s);
+					}
+				}
+			}
+
+			map.put(date, new ArrayList<>(freeSlots));
+			logger.info("processSlots :::  " + map);
+
+		}
+
+		return map;
 	}
 
 }

@@ -12,7 +12,11 @@ import com.infosys.seatsync.entity.booking.Booking;
 @Repository
 public interface SeatBookingRepository extends JpaRepository<Booking, Long> {
         
-	@Query(value = "SELECT * FROM booking b WHERE b.seat_id = :seatId AND b.booking_date = :date", nativeQuery = true)
-	List<Booking> findBySeatAndDate(@Param("seatId") Long seatId, @Param("date") String date);
+	@Query(value = "SELECT * FROM booking b " +
+            "WHERE b.seat_id = :seatId " +
+            "AND b.booking_date = :date " +
+            "AND b.status IN ('BOOKED', 'CHECKED_IN')", 
+    nativeQuery = true)	
+	List<Booking> findBookingInfo(@Param("seatId") Long seatId, @Param("date") String date);
 
 }
