@@ -29,4 +29,85 @@ public class Employee {
     @ManyToOne
     @JoinColumn(name = "home_dc_id")
     private DeliveryCenter homeDC;
+
+    public Employee(String empId, String name, String email, Wing.AccessType odcAccessType, Employee manager, Project project, DeliveryCenter homeDC) {
+        this.empId = empId;
+        this.name = name;
+        this.email = email;
+        this.odcAccessType = odcAccessType;
+        this.manager = manager;
+        this.project = project;
+        this.homeDC = homeDC;
+    }
+
+    @Override
+    public String toString() {
+        return "Employee{" +
+                "empId='" + empId + '\'' +
+                ", name='" + name + '\'' +
+                ", email='" + email + '\'' +
+                ", odcAccessType=" + odcAccessType +
+                ", project=" + project +
+                ", homeDC=" + homeDC +
+                '}';
+    }
+
+    public String getEmpId() {
+        return empId;
+    }
+
+    public void setEmpId(String empId) {
+        this.empId = empId;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public Wing.AccessType getOdcAccessType() {
+        return odcAccessType;
+    }
+
+    public void setOdcAccessType(Wing.AccessType odcAccessType) {
+        this.odcAccessType = odcAccessType;
+    }
+
+    public Employee getManager() {
+        return manager;
+    }
+
+    public void setManager(Employee manager) {
+        this.manager = manager;
+    }
+
+    public Project getProject() {
+        return project;
+    }
+
+    public void setProject(Project project) {
+        this.project = project;
+    }
+
+    public DeliveryCenter getHomeDC() {
+        return homeDC;
+    }
+
+    public void setHomeDC(DeliveryCenter homeDC) {
+        this.homeDC = homeDC;
+    }
+
+    public Employee() {
+    }
 }
