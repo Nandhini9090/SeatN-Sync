@@ -8,6 +8,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import com.infosys.seatsync.entity.booking.WaitList;
+import com.infosys.seatsync.entity.infra.Wing;
+import com.infosys.seatsync.repository.*;
 import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,9 +24,6 @@ import com.infosys.seatsync.entity.infra.Seat;
 import com.infosys.seatsync.model.AllocationResult;
 import com.infosys.seatsync.model.BookSeatResponse;
 import com.infosys.seatsync.model.BookSeatsRequest;
-import com.infosys.seatsync.repository.EmployeeRepository;
-import com.infosys.seatsync.repository.SeatBookingRepository;
-import com.infosys.seatsync.repository.SeatRepository;
 import com.infosys.seatsync.service.SeatBookingService;
 
 @Service
@@ -33,7 +33,13 @@ public class SeatBookingServiceImpl implements SeatBookingService {
 	EmployeeRepository employeeRepository;
 
 	@Autowired
+	WaitlistRepository waitlistRepository;
+
+	@Autowired
 	SeatBookingRepository seatBookingRepository;
+
+	@Autowired
+	WingRepository wingRepository;
 
 	@Autowired
 	SeatRepository seatRepository;
@@ -107,7 +113,7 @@ public class SeatBookingServiceImpl implements SeatBookingService {
 				Optional<Seat> free = findAnyFreeSeat(wingSeats, date);
 				if (free.isPresent()) {
 					try {
-						assignSeatAndPersist(empId, managerId, date, free.get(), result, bookingEmployee);
+						assignSeatAndPersist(managerId, date, free.get(), result, bookingEmployee);
 						allocated = true;
 					} catch (Throwable e) {
 						logger.error("Error occurred while trying to book seat : " + e.getMessage());
@@ -115,6 +121,7 @@ public class SeatBookingServiceImpl implements SeatBookingService {
 				} else {
 					result.setWaitlisted(true);
 					result.setReason("No free seats in wing - waitlisted");
+					waitingListBooking(date, bookingEmployee.get(), wingId);
 				}
 				response.getResults().add(result);
 				continue;
@@ -136,7 +143,7 @@ public class SeatBookingServiceImpl implements SeatBookingService {
 					List<Seat> cubicleSeats = seatsByCubicle.getOrDefault(cubicleId, Collections.emptyList());
 					Optional<Seat> freeSeat = cubicleSeats.stream().filter(s -> isSeatFree(s, date)).findFirst();
 					if (freeSeat.isPresent()) {
-						assignSeatAndPersist(empId, managerId, date, freeSeat.get(), result,
+						assignSeatAndPersist(managerId, date, freeSeat.get(), result,
 								bookingEmployee);
 						allocated = true;
 						break;
@@ -158,7 +165,7 @@ public class SeatBookingServiceImpl implements SeatBookingService {
 				List<Seat> seats = seatsByCubicle.getOrDefault(nearestCub, Collections.emptyList());
 				Optional<Seat> freeSeat = seats.stream().filter(s -> isSeatFree(s, date)).findFirst();
 				if (freeSeat.isPresent()) {
-					assignSeatAndPersist(empId, managerId, date, freeSeat.get(), result, bookingEmployee);
+					assignSeatAndPersist(managerId, date, freeSeat.get(), result, bookingEmployee);
 					response.getResults().add(result);
 					continue;
 				}
@@ -167,17 +174,43 @@ public class SeatBookingServiceImpl implements SeatBookingService {
 			// fallback - any free seat in wing
 			Optional<Seat> anyFree = findAnyFreeSeat(wingSeats, date);
 			if (anyFree.isPresent()) {
-				assignSeatAndPersist(empId, managerId, date, anyFree.get(), result, bookingEmployee);
+				assignSeatAndPersist(managerId, date, anyFree.get(), result, bookingEmployee);
 			} else {
 				// STEP 7: no seats -> waitlist
 				result.setWaitlisted(true);
 				result.setReason("No seats available in wing - waitlisted");
+				waitingListBooking(date, bookingEmployee.get(), wingId);
 			}
 
 			response.getResults().add(result);
 		}
 
 		return response;
+	}
+
+	@Transactional
+	private void waitingListBooking(String bookingDate, Employee employee, Long wingId) {
+
+		List<WaitList> waitLists = waitlistRepository.getWaitlistSorted(wingId, bookingDate);
+
+		int priority = waitLists.isEmpty()
+				? 1
+				: waitLists.get(0).getPriority() + 1;
+
+		Optional<Wing> wing = wingRepository.findById(wingId);
+		if(wing.isEmpty()){
+			throw new RuntimeException("Wing Id is invalid");
+		}
+
+		WaitList waitList = new WaitList();
+		waitList.setPriority(priority);
+		waitList.setBookingDate(bookingDate);
+		waitList.setEmployee(employee);
+		waitList.setWing(wing.get());
+		waitList.setStatus(WaitList.WaitlistStatus.WAITING);
+		waitList.setRemarks("Added to waitlist");
+
+		waitlistRepository.save(waitList);
 	}
 
 	private Optional<Seat> findAnyFreeSeat(List<Seat> wingSeats, String date) {
@@ -189,7 +222,7 @@ public class SeatBookingServiceImpl implements SeatBookingService {
 		return bookings.isEmpty();
 	}
 
-	private void assignSeatAndPersist(String empId, String managerId, String date, Seat seat, AllocationResult result, Optional<Employee> bookingEmployee) {
+	private void assignSeatAndPersist(String managerId, String date, Seat seat, AllocationResult result, Optional<Employee> bookingEmployee) {
 		result.setAllocatedSeatCode(seat.getSeatCode());
 		result.setAllocatedCubicleId(seat.getCubicleId());
 		result.setWaitlisted(false);

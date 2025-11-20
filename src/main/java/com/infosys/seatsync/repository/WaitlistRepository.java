@@ -2,6 +2,8 @@ package com.infosys.seatsync.repository;
 
 import com.infosys.seatsync.entity.booking.WaitList;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -24,5 +26,12 @@ public interface WaitlistRepository extends JpaRepository<WaitList, Long> {
 
     // Count WL entries for a wing (to assign next priority WL number)
     int countByWing_WingIdAndStatus(Long wingId, WaitList.WaitlistStatus status);
+
+    @Query("SELECT w FROM WaitList w " +
+            "WHERE w.wing.wingId = :wingId AND w.bookingDate = :bookingDate " +
+            "ORDER BY w.priority DESC")
+    List<WaitList> getWaitlistSorted(@Param("wingId") Long wingId,
+                                     @Param("bookingDate") String bookingDate);
+
 
 }
