@@ -1,11 +1,12 @@
 package com.infosys.seatsync.model;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
 public class BookSeatResponse {
   
-    private List<AllocationResult> results;
+    private List<AllocationResult> results = new ArrayList<>();
 
 	public List<AllocationResult> getResults() {
 		return results;

@@ -1,5 +1,7 @@
 package com.infosys.seatsync.service.impl;
 
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -233,10 +235,33 @@ public class SeatBookingServiceImpl implements SeatBookingService {
 		b.setStatus(BookingStatus.BOOKED);
 		Employee emp = bookingEmployee.get();
 		b.setEmployee(emp);
+		b.setStartTime(getCappedTime());
+		b.setEndTime("20:00");
 		b.setSeat(seat);
 		Employee manager = employeeRepository.findById(managerId).orElse(null);
 		b.setBookedBy(manager);
 		seatBookingRepository.save(b);
+	}
+
+	public static String getCappedTime() {
+
+		// Formatter: HH:mm (not HH:MM — MM is for month)
+		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm");
+
+		// Current time
+		LocalTime now = LocalTime.now();
+
+		// Add 30 minutes
+		LocalTime updated = now.plusMinutes(30);
+
+		// Cap at 12:00 PM
+		LocalTime cap = LocalTime.of(12, 0);
+		if (updated.isAfter(cap)) {
+			updated = cap;
+		}
+
+		// Return formatted result
+		return updated.format(formatter);
 	}
 
 	private Optional<String> findNearestCubicleWithTeammates(Set<String> bookedCubicles, Set<String> allCubicles) {

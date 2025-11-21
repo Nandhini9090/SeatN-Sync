@@ -18,6 +18,17 @@ public class SeatAvailabilityRequest {
     @JsonProperty("timeSlot")
     public TimeSlot timeSlot;
 
+    @JsonProperty("employeeId")
+    public String employeeId;
+
+    public String getEmployeeId() {
+        return employeeId;
+    }
+
+    public void setEmployeeId(String employeeId) {
+        this.employeeId = employeeId;
+    }
+
     // getters / setters
     public Long getWingId() { return wingId; }
     public void setWingId(Long wingId) { this.wingId = wingId; }

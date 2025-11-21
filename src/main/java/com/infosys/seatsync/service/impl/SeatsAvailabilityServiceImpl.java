@@ -101,6 +101,20 @@ public class SeatsAvailabilityServiceImpl implements SeatsAvailabilityService {
 			ba.setAvailableSeats(available);
 
 			// -----------------------
+			// 1️⃣ CHECK USER EXISTING BOOKING
+			// -----------------------
+			List<Booking> userBookings =
+					bookingRepository.findEmployeeBookings(req.getEmployeeId(), date);
+
+			if (!userBookings.isEmpty()) {
+				// User already has a booking on this date
+				ba.setAvailableSeats(0);
+				ba.setCurrentStatus("ALREADY_BOOKED");
+				map.put(date, ba);
+				continue; // <-- Skip other logic
+			}
+
+			// -----------------------
 			//  ADD CURRENT STATUS LOGIC
 			// -----------------------
 

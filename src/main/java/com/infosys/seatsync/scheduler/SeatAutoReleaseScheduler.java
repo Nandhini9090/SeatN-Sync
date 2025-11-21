@@ -34,7 +34,7 @@ public class SeatAutoReleaseScheduler {
     private static final Logger logger = LoggerFactory.getLogger(SeatAutoReleaseScheduler.class);
 
     @Transactional
-    @Scheduled(fixedRate = 300000) // runs every 5 minutes
+    @Scheduled(cron = "0 */5 8-11 * * *")
     public void autoReleaseExpiredBookings() {
         logger.info("Running auto release...");
         LocalDate today = LocalDate.now();
