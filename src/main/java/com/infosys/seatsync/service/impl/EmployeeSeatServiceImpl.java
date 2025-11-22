@@ -70,6 +70,7 @@ public class EmployeeSeatServiceImpl implements EmployeeSeatService {
                                 dto.setAccessType(booking.getSeat().getWing().getAccessType().toString());
                                 dto.setStartTime(booking.getStartTime());
                                 dto.setEndTime(booking.getEndTime());
+                                dto.setBookingId(booking.getBookingId());
                                 dto.setCurrentStatus(booking.getStatus().toString());
                                 return dto;
                             }).toList());
@@ -88,6 +89,7 @@ public class EmployeeSeatServiceImpl implements EmployeeSeatService {
                         dto.setAccessType(wl.getWing().getAccessType().name());
                         dto.setStartTime("NA");
                         dto.setEndTime("NA");
+                        dto.setWaitListId(wl.getId());
 
                         dto.setCurrentStatus("WAITLIST-WL" + wl.getPriority());
 

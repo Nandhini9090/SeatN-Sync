@@ -11,6 +11,23 @@ public class EmployeeSeatResponsePayloadDto {
     private String startTime;
     private String endTime;
     private String currentStatus;
+    private Long bookingId;
+    private Long waitListId;
+    public Long getBookingId() {
+        return bookingId;
+    }
+
+    public void setBookingId(Long bookingId) {
+        this.bookingId = bookingId;
+    }
+
+    public Long getWaitListId() {
+        return waitListId;
+    }
+
+    public void setWaitListId(Long waitListId) {
+        this.waitListId = waitListId;
+    }
 
     public String getCurrentStatus() {
         return currentStatus;
