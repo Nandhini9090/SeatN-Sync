@@ -3,6 +3,7 @@ package com.infosys.seatsync.service.impl;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import com.infosys.seatsync.entity.booking.WaitList;
 import com.infosys.seatsync.exception.BusinessException;
@@ -80,7 +81,7 @@ public class SeatsAvailabilityServiceImpl implements SeatsAvailabilityService {
 
 			return response;
 		} catch (Exception exception){
-			throw new BusinessException("AVAILABILITY_ERROR", "Unable to fetch the available seats. Try Again!");
+			throw new BusinessException("AVAILABILITY_ERROR", exception.getMessage());
 		}
 	}
 
@@ -110,8 +111,10 @@ public class SeatsAvailabilityServiceImpl implements SeatsAvailabilityService {
 			// -----------------------
 			List<Booking> userBookings =
 					bookingRepository.findEmployeeBookings(req.getEmployeeId(), date);
+			System.out.println("User Bookings: "+ userBookings);
 
-			Optional<WaitList> waitList = waitlistRepository.findByEmployee_EmpIdAndBookingDateAndStatus(req.employeeId, date, WaitList.WaitlistStatus.WAITING.toString());
+			Optional<WaitList> waitList = waitlistRepository.findByEmployee_EmpIdAndBookingDateAndStatus(req.employeeId, date, WaitList.WaitlistStatus.WAITING);
+			System.out.println("WaitingList isPresent: "+ waitList.isPresent());
 
 			if (!userBookings.isEmpty() || waitList.isPresent()) {
 				// User already has a booking on this date
@@ -148,7 +151,20 @@ public class SeatsAvailabilityServiceImpl implements SeatsAvailabilityService {
 			map.put(date, ba);
 			logger.info("processFullDay :::  " + map.toString());
 		}
-		return map;
+
+		//Sort based on date
+		return sortByDate(map);
+	}
+
+	public Map<String, BlockAvailability> sortByDate(Map<String, BlockAvailability> input) {
+		return input.entrySet()
+				.stream()
+				.sorted(Map.Entry.comparingByKey())  // ascending (earliest first)
+				.collect(
+						LinkedHashMap::new,
+						(m, e) -> m.put(e.getKey(), e.getValue()),
+						LinkedHashMap::putAll
+				);
 	}
 
 	private Map<String, List<String>> processSlots(SeatAvailabilityRequest req, List<Seat> seats) {
