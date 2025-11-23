@@ -1,5 +1,7 @@
 package com.infosys.seatsync.service.util;
 
+import com.infosys.seatsync.exception.BusinessException;
+
 import java.util.Map;
 
 public class SlotUtil {
@@ -50,7 +52,7 @@ public class SlotUtil {
 
         String[] parts = time.split(":");
         if (parts.length != 2) {
-            throw new IllegalArgumentException("Invalid time format: " + time);
+            throw new BusinessException("Invalid time format: " + time);
         }
         return String.format("%02d:%02d", Integer.parseInt(parts[0]), Integer.parseInt(parts[1]));
     }

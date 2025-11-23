@@ -7,6 +7,7 @@ import com.infosys.seatsync.entity.booking.Booking;
 import com.infosys.seatsync.entity.booking.WaitList;
 import com.infosys.seatsync.entity.emp.Employee;
 import com.infosys.seatsync.entity.infra.Seat;
+import com.infosys.seatsync.exception.BusinessException;
 import com.infosys.seatsync.repository.EmployeeRepository;
 import com.infosys.seatsync.repository.SeatBookingRepository;
 import com.infosys.seatsync.repository.WaitlistRepository;
@@ -37,76 +38,82 @@ public class EmployeeSeatServiceImpl implements EmployeeSeatService {
 
     @Override
     public EmployeeSeatResponseDto employeeBookedSeats(String empId) {
-        EmployeeSeatResponseDto employeeSeatResponseDto = new EmployeeSeatResponseDto();
 
-        Optional<List<Booking>> listOfBookings = seatBookingRepository.findByEmployee_EmpId(empId);
+        try {
+            EmployeeSeatResponseDto employeeSeatResponseDto = new EmployeeSeatResponseDto();
 
-        // 2. Fetch waiting list entries
-        List<WaitList> waitlists = waitlistRepository
-                .findByEmployee_EmpIdOrderByBookingDateAsc(empId);
+            Optional<List<Booking>> listOfBookings = seatBookingRepository.findByEmployee_EmpId(empId);
 
-        if(listOfBookings.isEmpty()){
-            employeeSeatResponseDto.setStatus("NO_BOOKING_FOUND");
-            employeeSeatResponseDto.setMessage("There is no seat booking for employee Id: "+ empId);
-            employeeSeatResponseDto.setTeamProximitySugguestionDto(checkTeamProximitySeats(empId));
-            return employeeSeatResponseDto;
-        } else {
+            // 2. Fetch waiting list entries
+            List<WaitList> waitlists = waitlistRepository
+                    .findByEmployee_EmpIdOrderByBookingDateAsc(empId);
 
-            //Map the required fields based on booking details
-            List<EmployeeSeatResponsePayloadDto> responseList =
-                    new java.util.ArrayList<>(listOfBookings.orElse(Collections.emptyList())
-                            .stream()
-                            .map(booking -> {
-                                EmployeeSeatResponsePayloadDto dto = new EmployeeSeatResponsePayloadDto();
+            if(listOfBookings.isEmpty()){
+                employeeSeatResponseDto.setStatus("NO_BOOKING_FOUND");
+                employeeSeatResponseDto.setMessage("There is no seat booking for employee Id: "+ empId);
+                employeeSeatResponseDto.setTeamProximitySugguestionDto(checkTeamProximitySeats(empId));
+                return employeeSeatResponseDto;
+            } else {
 
-                                Seat seat = booking.getSeat();
-                                dto.setCity(seat.getWing().getBlock().getDeliveryCenter().getLocation());
-                                dto.setDcName(seat.getWing().getBlock().getDeliveryCenter().getDcName());
-                                dto.setBlockName(seat.getWing().getBlock().getBlockName());
-                                dto.setWingName(seat.getWing().getWingName());
-                                dto.setSeatName(seat.getSeatCode());
+                //Map the required fields based on booking details
+                List<EmployeeSeatResponsePayloadDto> responseList =
+                        new java.util.ArrayList<>(listOfBookings.orElse(Collections.emptyList())
+                                .stream()
+                                .map(booking -> {
+                                    EmployeeSeatResponsePayloadDto dto = new EmployeeSeatResponsePayloadDto();
 
-                                dto.setBookingDate(booking.getBookingDate());
-                                dto.setAccessType(booking.getSeat().getWing().getAccessType().toString());
-                                dto.setStartTime(booking.getStartTime());
-                                dto.setEndTime(booking.getEndTime());
-                                dto.setBookingId(booking.getBookingId());
-                                dto.setCurrentStatus(booking.getStatus().toString());
-                                return dto;
-                            }).toList());
+                                    Seat seat = booking.getSeat();
+                                    dto.setCity(seat.getWing().getBlock().getDeliveryCenter().getLocation());
+                                    dto.setDcName(seat.getWing().getBlock().getDeliveryCenter().getDcName());
+                                    dto.setBlockName(seat.getWing().getBlock().getBlockName());
+                                    dto.setWingName(seat.getWing().getWingName());
+                                    dto.setSeatName(seat.getSeatCode());
 
-            // 4. Convert waiting list → DTO
-            List<EmployeeSeatResponsePayloadDto> wlDtos = waitlists.stream()
-                    .map(wl -> {
-                        EmployeeSeatResponsePayloadDto dto = new EmployeeSeatResponsePayloadDto();
+                                    dto.setBookingDate(booking.getBookingDate());
+                                    dto.setAccessType(booking.getSeat().getWing().getAccessType().toString());
+                                    dto.setStartTime(booking.getStartTime());
+                                    dto.setEndTime(booking.getEndTime());
+                                    dto.setBookingId(booking.getBookingId());
+                                    dto.setCurrentStatus(booking.getStatus().toString());
+                                    return dto;
+                                }).toList());
 
-                        dto.setCity(wl.getWing().getBlock().getDeliveryCenter().getLocation());
-                        dto.setDcName(wl.getWing().getBlock().getDeliveryCenter().getDcName());
-                        dto.setBlockName(wl.getWing().getBlock().getBlockName());
-                        dto.setWingName(wl.getWing().getWingName());
-                        dto.setSeatName("-");
-                        dto.setBookingDate(wl.getBookingDate());
-                        dto.setAccessType(wl.getWing().getAccessType().name());
-                        dto.setStartTime("NA");
-                        dto.setEndTime("NA");
-                        dto.setWaitListId(wl.getId());
+                // 4. Convert waiting list → DTO
+                List<EmployeeSeatResponsePayloadDto> wlDtos = waitlists.stream()
+                        .map(wl -> {
+                            EmployeeSeatResponsePayloadDto dto = new EmployeeSeatResponsePayloadDto();
 
-                        dto.setCurrentStatus("WAITLIST-WL" + wl.getPriority());
+                            dto.setCity(wl.getWing().getBlock().getDeliveryCenter().getLocation());
+                            dto.setDcName(wl.getWing().getBlock().getDeliveryCenter().getDcName());
+                            dto.setBlockName(wl.getWing().getBlock().getBlockName());
+                            dto.setWingName(wl.getWing().getWingName());
+                            dto.setSeatName("-");
+                            dto.setBookingDate(wl.getBookingDate());
+                            dto.setAccessType(wl.getWing().getAccessType().name());
+                            dto.setStartTime("NA");
+                            dto.setEndTime("NA");
+                            dto.setWaitListId(wl.getId());
 
-                        return dto;
-                    }).toList();
+                            dto.setCurrentStatus("WAITLIST-WL" + wl.getPriority());
 
-            // 5. Merge both lists
-            responseList.addAll(wlDtos);
+                            return dto;
+                        }).toList();
 
-            // 6. Sort by bookingDate ascending
-            responseList.sort(Comparator.comparing(EmployeeSeatResponsePayloadDto::getBookingDate));
+                // 5. Merge both lists
+                responseList.addAll(wlDtos);
 
-            employeeSeatResponseDto.setEmpSeats(responseList);
-            employeeSeatResponseDto.setStatus("SUCCESS");
-            employeeSeatResponseDto.setMessage("Employee seats has been successfully retrieved for employee Id: "+ empId);
-            employeeSeatResponseDto.setTeamProximitySugguestionDto(checkTeamProximitySeats(empId));
-            return employeeSeatResponseDto;
+                // 6. Sort by bookingDate ascending
+                responseList.sort(Comparator.comparing(EmployeeSeatResponsePayloadDto::getBookingDate));
+
+                employeeSeatResponseDto.setEmpSeats(responseList);
+                employeeSeatResponseDto.setStatus("SUCCESS");
+                employeeSeatResponseDto.setMessage("Employee seats has been successfully retrieved for employee Id: "+ empId);
+                employeeSeatResponseDto.setTeamProximitySugguestionDto(checkTeamProximitySeats(empId));
+                return employeeSeatResponseDto;
+            }
+
+        } catch (Exception exception){
+            throw new BusinessException("FETCH_ERROR", "Unable to fetch your booked seats. Try Again!");
         }
     }
 

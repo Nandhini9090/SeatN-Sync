@@ -5,6 +5,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 import com.infosys.seatsync.entity.booking.WaitList;
+import com.infosys.seatsync.exception.BusinessException;
 import com.infosys.seatsync.repository.WaitlistRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,42 +42,46 @@ public class SeatsAvailabilityServiceImpl implements SeatsAvailabilityService {
 	@Override
 	public SeatAvailabilityResponse getAvailableSeats(SeatAvailabilityRequest request) {
 
-		SeatAvailabilityResponse response = new SeatAvailabilityResponse();
+		try {
+			SeatAvailabilityResponse response = new SeatAvailabilityResponse();
 
-		if (request == null || request.getWingId() == null) {
-			throw new IllegalArgumentException("Request or WingId is null");
-		}
+			if (request == null || request.getWingId() == null) {
+				throw new BusinessException("INVALID_REQUEST","Request or WingId is null");
+			}
 
-		List<String> dates = request.getDates();
-		if (CollectionUtils.isEmpty(dates)) {
-			LocalDate today = LocalDate.now();
-			dates.add(today.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
-		}
-        
-		logger.info("SeatAvailabilityResponse :::: Dates" + dates);
+			List<String> dates = request.getDates();
+			if (CollectionUtils.isEmpty(dates)) {
+				LocalDate today = LocalDate.now();
+				dates.add(today.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
+			}
 
-		Long wingId = request.getWingId();
+			logger.info("SeatAvailabilityResponse :::: Dates" + dates);
 
-		// Fetch seats for wing
-		List<Seat> seats = seatRepository.getSeatsByWing(wingId);
+			Long wingId = request.getWingId();
 
-		if(seats.isEmpty()){
-			response.setMessage("Seats were not been added to specific wing Id:"+ wingId);
-			response.setStatus("NO_SEATS_ADDED");
+			// Fetch seats for wing
+			List<Seat> seats = seatRepository.getSeatsByWing(wingId);
+
+			if(seats.isEmpty()){
+				response.setMessage("Seats were not been added to specific wing Id:"+ wingId);
+				response.setStatus("NO_SEATS_ADDED");
+				return response;
+			}
+
+			logger.info("SeatAvailabilityResponse :::: seats" + seats);
+
+			if (request.getDuration().equalsIgnoreCase("FullDay")) {
+				response.setFullDayAvailability(processFullDay(request, seats));
+			} else {
+				response.setSlotAvailability(processSlots(request, seats));
+			}
+
+			logger.info("SeatAvailabilityResponse :::: Resonse ::" + response);
+
 			return response;
+		} catch (Exception exception){
+			throw new BusinessException("AVAILABILITY_ERROR", "Unable to fetch the available seats. Try Again!");
 		}
-		
-		logger.info("SeatAvailabilityResponse :::: seats" + seats);
-
-		if (request.getDuration().equalsIgnoreCase("FullDay")) {
-			response.setFullDayAvailability(processFullDay(request, seats));
-		} else {
-			response.setSlotAvailability(processSlots(request, seats));
- 		}
-        
-		logger.info("SeatAvailabilityResponse :::: Resonse ::" + response);
-
-		return response;
 	}
 
 	private Map<String, BlockAvailability> processFullDay(SeatAvailabilityRequest req, List<Seat> seats) {

@@ -57,140 +57,146 @@ public class SeatBookingServiceImpl implements SeatBookingService {
 	@Override
 	public BookSeatResponse bookASeat(BookSeatsRequest request) {
 
-		BookSeatResponse response = new BookSeatResponse();
+		try {
+			BookSeatResponse response = new BookSeatResponse();
 
-		if (null == request.getEmployee_id()) {
-			throw new IllegalArgumentException("employee id is null");
-		}
+			if (null == request.getEmployee_id()) {
+				throw new BusinessException("INVALID_REQUEST","Invalid Request - Emp Id is not present");
+			}
 
-		// 1.load the employee details using emp_id
-		String empId = request.getEmployee_id();
-		Optional<Employee> bookingEmployee = employeeRepository.findById(empId);
+			// 1.load the employee details using emp_id
+			String empId = request.getEmployee_id();
+			Optional<Employee> bookingEmployee = employeeRepository.findById(empId);
 
-		if(bookingEmployee.isEmpty()) {
-			throw new RuntimeException("Employee not present");
-		}
+			if(bookingEmployee.isEmpty()) {
+				throw new BusinessException("EMP_NOT_FOUND","Employee not present with Id: "+ empId);
+			}
 
-		if(request.getDates() == null || request.getDates().isEmpty())
-			throw new IllegalArgumentException("Booking dates cannot be empty");
+			if(request.getDates() == null || request.getDates().isEmpty())
+				throw new BusinessException("DATE_VALIDATION","Booking dates cannot be empty");
 
-		boolean allocated = false; // flag which denotes whether seat is booked or not
+			boolean allocated = false; // flag which denotes whether seat is booked or not
 
-		// 2.get the manager id of the employee
-		String managerId = bookingEmployee.get().getManager().getEmpId();
-		logger.info("Manager Id of the employee ::: {}", managerId);
+			// 2.get the manager id of the employee
+			String managerId = bookingEmployee.get().getManager().getEmpId();
+			logger.info("Manager Id of the employee ::: {}", managerId);
 
-		// 3. preload wing seats once per call
-		Long wingId = request.getWingId();
-		List<Seat> wingSeats = seatRepository.getSeatsByWing(wingId);
-		Map<String, List<Seat>> seatsByCubicle = wingSeats.stream().collect(Collectors.groupingBy(Seat::getCubicleId));
+			// 3. preload wing seats once per call
+			Long wingId = request.getWingId();
+			List<Seat> wingSeats = seatRepository.getSeatsByWing(wingId);
+			Map<String, List<Seat>> seatsByCubicle = wingSeats.stream().collect(Collectors.groupingBy(Seat::getCubicleId));
 
-		/*
-		 * for each date perform below steps, 
-		 * 1.get the bookings of the employees under
-		 * same manager and in the same wing. filter by booked_by manager id,wing
-		 * id,date, booking status BOOKED,CHEKED_IN
-		 * 2.if booking is empty book any available seat in the same wing 
-		 * 3.group the bookings by cubicle_id 4.for each
-		 * cubicle, 
-		 *     1.if size is < 4, No Seat is available. continue to check other
-		 *       cubicles 
-		 *     2.else get the available seat and book the seat 
-		 *     3.In none of the
-		 *       cubicles seats are not available find the nearest cubicle where his/her
-		 *       teammate booked and allocate seat 
-		 *     4..if nearest also not available book
-		 *       random. 
-		 *     5.if no seats are available book the employee in waiting list
-		 */
+			/*
+			 * for each date perform below steps,
+			 * 1.get the bookings of the employees under
+			 * same manager and in the same wing. filter by booked_by manager id,wing
+			 * id,date, booking status BOOKED,CHEKED_IN
+			 * 2.if booking is empty book any available seat in the same wing
+			 * 3.group the bookings by cubicle_id 4.for each
+			 * cubicle,
+			 *     1.if size is < 4, No Seat is available. continue to check other
+			 *       cubicles
+			 *     2.else get the available seat and book the seat
+			 *     3.In none of the
+			 *       cubicles seats are not available find the nearest cubicle where his/her
+			 *       teammate booked and allocate seat
+			 *     4..if nearest also not available book
+			 *       random.
+			 *     5.if no seats are available book the employee in waiting list
+			 */
 
-		for (String date : request.getDates()) {
+			for (String date : request.getDates()) {
 
-			allocated = false;
+				allocated = false;
 
-			AllocationResult result = new AllocationResult();
-			result.setEmpId(empId);
-			result.setDate(date);
-			// get team mates bookings in same wing & date (booked_by = manager)
-			List<Booking> teamBookings = seatBookingRepository.findBookings(managerId, date, wingId);
+				AllocationResult result = new AllocationResult();
+				result.setEmpId(empId);
+				result.setDate(date);
+				// get team mates bookings in same wing & date (booked_by = manager)
+				List<Booking> teamBookings = seatBookingRepository.findBookings(managerId, date, wingId);
 
-			if (teamBookings.isEmpty()) {
-				Optional<Seat> free = findAnyFreeSeat(wingSeats, date);
-				if (free.isPresent()) {
-					try {
-						assignSeatAndPersist(managerId, date, free.get(), result, bookingEmployee);
-						allocated = true;
-					} catch (Throwable e) {
-						logger.error("Error occurred while trying to book seat : " + e.getMessage());
+				if (teamBookings.isEmpty()) {
+					Optional<Seat> free = findAnyFreeSeat(wingSeats, date);
+					if (free.isPresent()) {
+						try {
+							assignSeatAndPersist(managerId, date, free.get(), result, bookingEmployee);
+							allocated = true;
+						} catch (Throwable e) {
+							logger.error("Error occurred while trying to book seat : " + e.getMessage());
+							throw new BusinessException("Error occurred while trying to book seat");
+						}
+					} else {
+						result.setWaitlisted(true);
+						result.setReason("No free seats in wing - waitlisted");
+						waitingListBooking(date, bookingEmployee.get(), wingId);
 					}
-				} else {
-					result.setWaitlisted(true);
-					result.setReason("No free seats in wing - waitlisted");
-					waitingListBooking(date, bookingEmployee.get(), wingId);
-				}
-				response.getResults().add(result);
-				continue;
-			}
-
-			// group by cubicle id for team mates
-			Map<String, List<Booking>> bookingsByCubicle = teamBookings.stream()
-					.filter(b -> b.getSeat() != null && b.getSeat().getCubicleId() != null)
-					.collect(Collectors.groupingBy(b -> b.getSeat().getCubicleId()));
-
-			// try cubicles where team already booked - prefer their cubicle if capacity
-			// allows
-			for (Map.Entry<String, List<Booking>> entry : bookingsByCubicle.entrySet()) {
-				String cubicleId = entry.getKey();
-				int bookedCount = entry.getValue().size();
-
-				if (bookedCount < CUBICLE_CAPACITY) {
-					// find any free seat in this cubicle
-					List<Seat> cubicleSeats = seatsByCubicle.getOrDefault(cubicleId, Collections.emptyList());
-					Optional<Seat> freeSeat = cubicleSeats.stream().filter(s -> isSeatFree(s, date)).findFirst();
-					if (freeSeat.isPresent()) {
-						assignSeatAndPersist(managerId, date, freeSeat.get(), result,
-								bookingEmployee);
-						allocated = true;
-						break;
-					}
-				}
-			}
-
-			if (allocated) {
-				response.getResults().add(result);
-				continue;
-			}
-
-			// none of the teammate cubicles have space -> find nearest cubicle that
-			// contains teammates
-			Optional<String> nearestCubicleOpt = findNearestCubicleWithTeammates(bookingsByCubicle.keySet(),
-					seatsByCubicle.keySet());
-			if (nearestCubicleOpt.isPresent()) {
-				String nearestCub = nearestCubicleOpt.get();
-				List<Seat> seats = seatsByCubicle.getOrDefault(nearestCub, Collections.emptyList());
-				Optional<Seat> freeSeat = seats.stream().filter(s -> isSeatFree(s, date)).findFirst();
-				if (freeSeat.isPresent()) {
-					assignSeatAndPersist(managerId, date, freeSeat.get(), result, bookingEmployee);
 					response.getResults().add(result);
 					continue;
 				}
+
+				// group by cubicle id for team mates
+				Map<String, List<Booking>> bookingsByCubicle = teamBookings.stream()
+						.filter(b -> b.getSeat() != null && b.getSeat().getCubicleId() != null)
+						.collect(Collectors.groupingBy(b -> b.getSeat().getCubicleId()));
+
+				// try cubicles where team already booked - prefer their cubicle if capacity
+				// allows
+				for (Map.Entry<String, List<Booking>> entry : bookingsByCubicle.entrySet()) {
+					String cubicleId = entry.getKey();
+					int bookedCount = entry.getValue().size();
+
+					if (bookedCount < CUBICLE_CAPACITY) {
+						// find any free seat in this cubicle
+						List<Seat> cubicleSeats = seatsByCubicle.getOrDefault(cubicleId, Collections.emptyList());
+						Optional<Seat> freeSeat = cubicleSeats.stream().filter(s -> isSeatFree(s, date)).findFirst();
+						if (freeSeat.isPresent()) {
+							assignSeatAndPersist(managerId, date, freeSeat.get(), result,
+									bookingEmployee);
+							allocated = true;
+							break;
+						}
+					}
+				}
+
+				if (allocated) {
+					response.getResults().add(result);
+					continue;
+				}
+
+				// none of the teammate cubicles have space -> find nearest cubicle that
+				// contains teammates
+				Optional<String> nearestCubicleOpt = findNearestCubicleWithTeammates(bookingsByCubicle.keySet(),
+						seatsByCubicle.keySet());
+				if (nearestCubicleOpt.isPresent()) {
+					String nearestCub = nearestCubicleOpt.get();
+					List<Seat> seats = seatsByCubicle.getOrDefault(nearestCub, Collections.emptyList());
+					Optional<Seat> freeSeat = seats.stream().filter(s -> isSeatFree(s, date)).findFirst();
+					if (freeSeat.isPresent()) {
+						assignSeatAndPersist(managerId, date, freeSeat.get(), result, bookingEmployee);
+						response.getResults().add(result);
+						continue;
+					}
+				}
+
+				// fallback - any free seat in wing
+				Optional<Seat> anyFree = findAnyFreeSeat(wingSeats, date);
+				if (anyFree.isPresent()) {
+					assignSeatAndPersist(managerId, date, anyFree.get(), result, bookingEmployee);
+				} else {
+					// STEP 7: no seats -> waitlist
+					result.setWaitlisted(true);
+					result.setReason("No seats available in wing - waitlisted");
+					waitingListBooking(date, bookingEmployee.get(), wingId);
+				}
+
+				response.getResults().add(result);
 			}
 
-			// fallback - any free seat in wing
-			Optional<Seat> anyFree = findAnyFreeSeat(wingSeats, date);
-			if (anyFree.isPresent()) {
-				assignSeatAndPersist(managerId, date, anyFree.get(), result, bookingEmployee);
-			} else {
-				// STEP 7: no seats -> waitlist
-				result.setWaitlisted(true);
-				result.setReason("No seats available in wing - waitlisted");
-				waitingListBooking(date, bookingEmployee.get(), wingId);
-			}
+			return response;
 
-			response.getResults().add(result);
+		} catch (Exception e) {
+			throw new BusinessException("SEAT_BOOKING_ERROR", "Unable to book a seat. Try Again!");
 		}
-
-		return response;
 	}
 
 	@Override
@@ -240,7 +246,7 @@ public class SeatBookingServiceImpl implements SeatBookingService {
 
 		Optional<Wing> wing = wingRepository.findById(wingId);
 		if(wing.isEmpty()){
-			throw new RuntimeException("Wing Id is invalid");
+			throw new BusinessException("INVALID_WING","Wing Id is invalid");
 		}
 
 		WaitList waitList = new WaitList();
@@ -312,7 +318,7 @@ public class SeatBookingServiceImpl implements SeatBookingService {
 		Map<String, Integer> mapAll = allCubicles.stream()
 				.collect(Collectors.toMap(c -> c, this::extractNum, (a, b) -> a));
 
-		List<Integer> allNums = mapAll.values().stream().filter(Objects::nonNull).collect(Collectors.toList());
+		List<Integer> allNums = mapAll.values().stream().filter(Objects::nonNull).toList();
 		if (mapBooked.values().stream().allMatch(Objects::isNull) || allNums.isEmpty()) {
 			return Optional.of(bookedCubicles.iterator().next());
 		}

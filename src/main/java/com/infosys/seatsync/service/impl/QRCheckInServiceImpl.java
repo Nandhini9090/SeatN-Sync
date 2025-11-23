@@ -4,6 +4,7 @@ import com.infosys.seatsync.dto.qr.QRCheckInResponseDto;
 import com.infosys.seatsync.entity.booking.Booking;
 import com.infosys.seatsync.entity.booking.QRCheckIn;
 import com.infosys.seatsync.entity.emp.Employee;
+import com.infosys.seatsync.exception.BusinessException;
 import com.infosys.seatsync.repository.AttendanceLogRepository;
 import com.infosys.seatsync.repository.EmployeeRepository;
 import com.infosys.seatsync.repository.QRCheckInRepository;
@@ -42,60 +43,65 @@ public class QRCheckInServiceImpl implements QRCheckInService {
     @Transactional
     @Override
     public QRCheckInResponseDto processCheckIn(String seatHashCode, String empId) {
-        QRCheckInResponseDto qrCheckInResponseDto = new QRCheckInResponseDto();
+        try {
+            QRCheckInResponseDto qrCheckInResponseDto = new QRCheckInResponseDto();
 
-        boolean employeeExist = employeeRepository.existsById(empId);
-        if(employeeExist){
-            qrCheckInResponseDto.setStatus("EMP_NOT_FOUND");
-            qrCheckInResponseDto.setMessage("There is no Employee record found");
-            return qrCheckInResponseDto;
-        }
+            boolean employeeExist = employeeRepository.existsById(empId);
+            if(employeeExist){
+                qrCheckInResponseDto.setStatus("EMP_NOT_FOUND");
+                qrCheckInResponseDto.setMessage("There is no Employee record found");
+                return qrCheckInResponseDto;
+            }
 
-        LocalDate today = LocalDate.now();
-        LocalDateTime startOfDay = today.atStartOfDay();
-        LocalDateTime endOfDay = today.atTime(23, 59, 59);
+            LocalDate today = LocalDate.now();
+            LocalDateTime startOfDay = today.atStartOfDay();
+            LocalDateTime endOfDay = today.atTime(23, 59, 59);
 
 
-        //level 1 - Check if the emp has attendance record for the same date
-        boolean isAttendanceExists = attendanceLogRepository.existsByEmployee_EmpIdAndSwipeTimeBetween(empId, startOfDay, endOfDay);
-        if(isAttendanceExists) {
-            //level 2 - check if the emp has already had an active booking
-            Optional<Booking> optionalBooking = seatBookingRepository.findByEmployee_EmpIdAndSeat_HashCodeAndBookingDateAndStatus(empId, seatHashCode, getCurrentDate(), Booking.BookingStatus.BOOKED);
-            if(optionalBooking.isPresent()){
-                //level 3 - check if the QR checkIn is between the buffer period
-                boolean qrScanWithInTimeSlot = isWithinCheckInBuffer(optionalBooking.get().getStartTime(), 45);
-                if(qrScanWithInTimeSlot){
+            //level 1 - Check if the emp has attendance record for the same date
+            boolean isAttendanceExists = attendanceLogRepository.existsByEmployee_EmpIdAndSwipeTimeBetween(empId, startOfDay, endOfDay);
+            if(isAttendanceExists) {
+                //level 2 - check if the emp has already had an active booking
+                Optional<Booking> optionalBooking = seatBookingRepository.findByEmployee_EmpIdAndSeat_HashCodeAndBookingDateAndStatus(empId, seatHashCode, getCurrentDate(), Booking.BookingStatus.BOOKED);
+                if(optionalBooking.isPresent()){
+                    //level 3 - check if the QR checkIn is between the buffer period
+                    boolean qrScanWithInTimeSlot = isWithinCheckInBuffer(optionalBooking.get().getStartTime(), 45);
+                    if(qrScanWithInTimeSlot){
 
-                    //Update booking status
-                    Booking updatedBooking = optionalBooking.get();
-                    updatedBooking.setStatus(Booking.BookingStatus.CHECKED_IN);
-                    seatBookingRepository.save(updatedBooking);
+                        //Update booking status
+                        Booking updatedBooking = optionalBooking.get();
+                        updatedBooking.setStatus(Booking.BookingStatus.CHECKED_IN);
+                        seatBookingRepository.save(updatedBooking);
 
-                    //QR CheckIn Record
-                    QRCheckIn qrCheckIn = new QRCheckIn();
-                    qrCheckIn.setBooking(updatedBooking);
-                    qrCheckIn.setCheckinTime(LocalDateTime.now());
-                    qrCheckIn.setEmployee(optionalBooking.get().getEmployee());
-                    qrCheckIn.setSeat(optionalBooking.get().getSeat());
-                    qrCheckInRepository.save(qrCheckIn);
+                        //QR CheckIn Record
+                        QRCheckIn qrCheckIn = new QRCheckIn();
+                        qrCheckIn.setBooking(updatedBooking);
+                        qrCheckIn.setCheckinTime(LocalDateTime.now());
+                        qrCheckIn.setEmployee(optionalBooking.get().getEmployee());
+                        qrCheckIn.setSeat(optionalBooking.get().getSeat());
+                        qrCheckInRepository.save(qrCheckIn);
 
-                    logger.info("Employee checkIn within time limit of the seat booking");
-                    return constructQRCheckInSuccessResponse();
+                        logger.info("Employee checkIn within time limit of the seat booking");
+                        return constructQRCheckInSuccessResponse();
+                    } else {
+                        qrCheckInResponseDto.setStatus("QR_SCAN_EXPIRY");
+                        qrCheckInResponseDto.setMessage("Employee is not allowed to checkIn since the time limit has been exceeded");
+                        return qrCheckInResponseDto;
+                    }
                 } else {
-                    qrCheckInResponseDto.setStatus("QR_SCAN_EXPIRY");
-                    qrCheckInResponseDto.setMessage("Employee is not allowed to checkIn since the time limit has been exceeded");
+                    qrCheckInResponseDto.setStatus("SEAT_NOT_BOOKED_OR_ALREADY_CHECK_IN");
+                    qrCheckInResponseDto.setMessage("QR checkIn is not possible since the seat is not been booked");
                     return qrCheckInResponseDto;
                 }
             } else {
-                qrCheckInResponseDto.setStatus("SEAT_NOT_BOOKED_OR_ALREADY_CHECK_IN");
-                qrCheckInResponseDto.setMessage("QR checkIn is not possible since the seat is not been booked");
+                qrCheckInResponseDto.setStatus("EMP_ATTENDANCE_NOT_FOUND");
+                qrCheckInResponseDto.setMessage("There is no Employee attendance record for today");
                 return qrCheckInResponseDto;
             }
-        } else {
-            qrCheckInResponseDto.setStatus("EMP_ATTENDANCE_NOT_FOUND");
-            qrCheckInResponseDto.setMessage("There is no Employee attendance record for today");
-            return qrCheckInResponseDto;
+        } catch (Exception exception){
+            throw new BusinessException("ERROR_QR_SCAN", "Unable to Check-In your seat. Try Again!");
         }
+
     }
 
     public boolean isWithinCheckInBuffer(String startTime, int bufferMinutes) {
