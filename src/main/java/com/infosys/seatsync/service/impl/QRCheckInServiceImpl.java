@@ -21,6 +21,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.Optional;
 
 @Service
@@ -65,7 +66,7 @@ public class QRCheckInServiceImpl implements QRCheckInService {
                 if(optionalBooking.isPresent()){
                     //level 3 - check if the QR checkIn is between the buffer period
                     boolean qrScanWithInTimeSlot = isWithinCheckInBuffer(optionalBooking.get().getStartTime(), 45);
-                    if(qrScanWithInTimeSlot){
+                    if(qrScanWithInTimeSlot || isNoon(optionalBooking.get().getStartTime())){
 
                         //Update booking status
                         Booking updatedBooking = optionalBooking.get();
@@ -98,6 +99,15 @@ public class QRCheckInServiceImpl implements QRCheckInService {
             throw new BusinessException("ERROR_QR_SCAN", exception.getMessage());
         }
 
+    }
+
+    public boolean isNoon(String time) {
+        try {
+            LocalTime localTime = LocalTime.parse(time); // expects HH:mm format
+            return localTime.getHour() == 12;
+        } catch (DateTimeParseException e) {
+            return false; // invalid time format
+        }
     }
 
     public boolean isWithinCheckInBuffer(String startTime, int bufferMinutes) {
